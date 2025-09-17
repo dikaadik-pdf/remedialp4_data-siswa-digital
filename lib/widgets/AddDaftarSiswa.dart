@@ -56,7 +56,7 @@ class _ListPageState extends State<ListPage> {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black26,
+                        color: Colors.black12,
                         blurRadius: 12,
                         offset: Offset(0, 6),
                       ),

@@ -8,8 +8,7 @@ void main() async {
 
   await Supabase.initialize(
     url: 'https://qrpwmbohdxzqkcbybvue.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycHdtYm9oZHh6cWtjYnlidnVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5OTAxMzEsImV4cCI6MjA3MzU2NjEzMX0.Yc46cV6EKSigAvjSyoWscTrC6LkHA-A84mjWdZOnuyA',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycHdtYm9oZHh6cWtjYnlidnVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5OTAxMzEsImV4cCI6MjA3MzU2NjEzMX0.Yc46cV6EKSigAvjSyoWscTrC6LkHA-A84mjWdZOnuyA',
   );
 
   runApp(const MyApp());
@@ -25,15 +24,13 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const DaftarSiswaDigitalPage(),
-    const ListPage(),
+  final List<Widget> _pages = const [
+    DaftarSiswaDigitalPage(),
+    ListPage(),
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
@@ -47,16 +44,13 @@ class _MyAppState extends State<MyApp> {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // Segitiga custom
               CustomPaint(
                 size: const Size(double.infinity, 70),
                 painter: NavBarPainter(),
               ),
-
-              // Icon kiri
               Positioned(
                 left: 50,
-                bottom: 8, // 🔽 diturunin sedikit
+                bottom: 8,
                 child: GestureDetector(
                   onTap: () => _onItemTapped(0),
                   child: Icon(
@@ -66,11 +60,9 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ),
               ),
-
-              // Icon kanan
               Positioned(
                 right: 50,
-                bottom: 8, // 🔽 diturunin sedikit
+                bottom: 8,
                 child: GestureDetector(
                   onTap: () => _onItemTapped(1),
                   child: Icon(
@@ -103,9 +95,7 @@ class NavBarPainter extends CustomPainter {
     path.lineTo(0, size.height);
     path.close();
 
-    // bayangan
     canvas.drawShadow(path, Colors.black.withOpacity(0.25), 6, false);
-
     canvas.drawPath(path, paint);
   }
 
