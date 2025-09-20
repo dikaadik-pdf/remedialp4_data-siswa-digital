@@ -26,6 +26,84 @@ class _ListPageState extends State<ListPage> {
     });
   }
 
+  /// Fungsi dialog konfirmasi
+  Future<bool> _showConfirmDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.orangeAccent,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Image.asset("assets/images/logo.png"),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Apakah Anda Yakin Untuk Menghapus Data Ini?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text("Batal"),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text("Hapus"),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -109,11 +187,14 @@ class _ListPageState extends State<ListPage> {
                           );
                         },
                         onDelete: () async {
-                          await Supabase.instance.client
-                              .from('siswa')
-                              .delete()
-                              .eq('id', siswa['id']);
-                          _loadSiswa();
+                          final confirm = await _showConfirmDialog(context);
+                          if (confirm) {
+                            await Supabase.instance.client
+                                .from('siswa')
+                                .delete()
+                                .eq('id', siswa['id']);
+                            _loadSiswa();
+                          }
                         },
                         onEdit: (updatedSiswa) async {
                           await Supabase.instance.client
