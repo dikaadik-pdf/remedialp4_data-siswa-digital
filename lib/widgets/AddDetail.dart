@@ -14,7 +14,7 @@ class DetailSiswaScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 🔹 Header sama kayak form
+              // 🔹 Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
@@ -113,7 +113,7 @@ class DetailSiswaScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
 
-                        // 🔹 Tampilkan semua data
+                        // 🔹 Informasi pribadi
                         buildDetailItem("NISN", siswa['nisn']),
                         buildDetailItem("Nama Lengkap", siswa['nama_lengkap']),
                         buildDetailItem("Jenis Kelamin", siswa['jenis_kelamin']),
@@ -133,7 +133,12 @@ class DetailSiswaScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         buildDetailItem("Jalan", siswa['jalan']),
-                        buildDetailItem("RT/RW", siswa['rt_rw']),
+                        buildDetailItem(
+                          "RT/RW",
+                          (siswa['rt'] == null && siswa['rw'] == null)
+                              ? "-"
+                              : "${siswa['rt'] ?? '-'} / ${siswa['rw'] ?? '-'}",
+                        ),
                         buildDetailItem("Dusun", siswa['dusun']),
                         buildDetailItem("Desa", siswa['desa']),
                         buildDetailItem("Kecamatan", siswa['kecamatan']),
@@ -153,7 +158,8 @@ class DetailSiswaScreen extends StatelessWidget {
                         buildDetailItem("Nama Ayah", siswa['nama_ayah']),
                         buildDetailItem("Nama Ibu", siswa['nama_ibu']),
                         buildDetailItem("Nama Wali", siswa['nama_wali']),
-                        buildDetailItem("Alamat Ortu/Wali", siswa['alamat_orang_tua_wali']),
+                        buildDetailItem(
+                            "Alamat Ortu/Wali", siswa['alamat_orang_tua_wali']),
                       ],
                     ),
                   ),

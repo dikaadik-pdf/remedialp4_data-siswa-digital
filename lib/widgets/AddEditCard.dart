@@ -528,49 +528,125 @@ class _EditSiswaFormState extends State<EditSiswaForm> {
   }
 
   Widget buildDusunAutocomplete() {
-  return TypeAheadFormField<Map<String, dynamic>?>(
-    textFieldConfiguration: TextFieldConfiguration(
-      controller: _dusunController,
-      decoration: InputDecoration(
-        labelText: "Dusun",
-        floatingLabelStyle: const TextStyle(
-            color: Colors.deepOrange, fontWeight: FontWeight.bold),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.deepOrange)),
-      ),
-    ),
-    suggestionsCallback: (pattern) async {
-      if (pattern.isEmpty) return [];
-      final response = await Supabase.instance.client
-          .from('dusun')
-          .select()
-          .ilike('nama', '%$pattern%')
-          .limit(10);
-      return (response as List).cast<Map<String, dynamic>>();
-    },
-    itemBuilder: (context, suggestion) {
-      return ListTile(
-        title: Text(suggestion?['nama'] ?? ''),
-        subtitle: Text(
-          "${suggestion?['desa'] ?? ''}, "
-          "${suggestion?['kecamatan'] ?? ''}, "
-          "${suggestion?['kabupaten'] ?? ''}",
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: TypeAheadFormField<Map<String, dynamic>?>(
+      textFieldConfiguration: TextFieldConfiguration(
+        controller: _dusunController,
+        decoration: InputDecoration(
+          labelText: "Dusun",
+          floatingLabelStyle: const TextStyle(
+              color: Colors.deepOrange, fontWeight: FontWeight.bold),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.deepOrange)),
         ),
-      );
-    },
-    onSuggestionSelected: (suggestion) {
-      _dusunController.text = suggestion?['nama'] ?? '';
-      _desaController.text = suggestion?['desa'] ?? '';
-      _kecamatanController.text = suggestion?['kecamatan'] ?? '';
-      _kabupatenController.text = suggestion?['kabupaten'] ?? '';
-      _provinsiController.text = suggestion?['provinsi'] ?? '';
-      _kodePosController.text = suggestion?['kode_pos'] ?? '';
-    },
-    validator: (val) => val == null || val.isEmpty ? "Dusun wajib diisi" : null,
+      ),
+      suggestionsCallback: (pattern) async {
+        if (pattern.isEmpty) return [];
+        try {
+          final response = await Supabase.instance.client
+              .from('locations')
+              .select('dusun, desa, kecamatan, kabupaten, provinsi, kode_pos')
+              .or('dusun.ilike.%$pattern%,desa.ilike.%$pattern%,kecamatan.ilike.%$pattern%')
+              .order('dusun')
+              .limit(50);
+
+          final List<Map<String, dynamic>> allData = 
+              (response as List).cast<Map<String, dynamic>>();
+          
+          // Remove duplicates berdasarkan kombinasi unik
+          final Map<String, Map<String, dynamic>> uniqueMap = {};
+          
+          for (final item in allData) {
+            final dusun = item['dusun']?.toString() ?? '';
+            final desa = item['desa']?.toString() ?? '';
+            final kecamatan = item['kecamatan']?.toString() ?? '';
+            
+            if (dusun.isNotEmpty) {
+              final key = '$dusun|$desa|$kecamatan'.toLowerCase();
+              if (!uniqueMap.containsKey(key)) {
+                uniqueMap[key] = item;
+              }
+            }
+          }
+
+          return uniqueMap.values.take(10).toList();
+        } catch (e) {
+          print('Error fetching locations: $e');
+          return [];
+        }
+      },
+      itemBuilder: (context, suggestion) {
+        if (suggestion == null) return const SizedBox.shrink();
+        
+        final dusun = suggestion['dusun']?.toString() ?? '';
+        final desa = suggestion['desa']?.toString() ?? '';
+        final kecamatan = suggestion['kecamatan']?.toString() ?? '';
+        final kabupaten = suggestion['kabupaten']?.toString() ?? '';
+        
+        return ListTile(
+          title: Text(
+            dusun,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          subtitle: Text(
+            '$desa, $kecamatan\n$kabupaten',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+          ),
+          isThreeLine: true,
+          dense: true,
+        );
+      },
+      onSuggestionSelected: (suggestion) {
+        if (suggestion == null) return;
+        
+        _dusunController.text = suggestion['dusun']?.toString() ?? '';
+        _desaController.text = suggestion['desa']?.toString() ?? '';
+        _kecamatanController.text = suggestion['kecamatan']?.toString() ?? '';
+        _kabupatenController.text = suggestion['kabupaten']?.toString() ?? '';
+        _provinsiController.text = suggestion['provinsi']?.toString() ?? '';
+        _kodePosController.text = suggestion['kode_pos']?.toString() ?? '';
+        
+        // Unfocus untuk menutup keyboard
+        FocusScope.of(context).unfocus();
+      },
+      validator: (val) => val == null || val.isEmpty ? "Dusun wajib diisi" : null,
+      noItemsFoundBuilder: (context) => const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text(
+          'Tidak ada data ditemukan',
+          style: TextStyle(
+            color: Colors.grey,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ),
+      loadingBuilder: (context) => const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text('Mencari data...'),
+          ],
+        ),
+      ),
+      hideOnEmpty: true,
+      hideOnLoading: false,
+      animationDuration: const Duration(milliseconds: 300),
+    ),
   );
 }
 }

@@ -2,37 +2,27 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
-// ----------------------
-// Helper: RT/RW Formatter
+// =================== RT/RW INPUT FORMATTER ===================
 class RtRwInputFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
     final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) return newValue.copyWith(text: '');
-
-    // Batasi total digit menjadi maksimal 4 (RT dan RW masing-masing hingga 2 digit)
-    if (digits.length > 4) {
-      return oldValue; // Tidak mengizinkan lebih dari 4 digit
-    }
-
+    
+    if (digits.length > 4) return oldValue;
+    
     String formatted = '';
     if (digits.length <= 2) {
       formatted = digits.padLeft(2, '0');
     } else {
-      // Pisahkan menjadi RT dan RW, maksimal 2 digit per bagian
       String rt = digits.substring(0, 2).padLeft(2, '0');
-      String rw = digits.length > 2 ? digits.substring(2, digits.length <= 4 ? digits.length : 4).padLeft(2, '0') : '20';
+      String rw = digits.substring(2, digits.length <= 4 ? digits.length : 4).padLeft(2, '0');
       formatted = '$rt/$rw';
     }
-
-    // Pastikan total panjang (termasuk "/") tidak melebihi 5 karakter
-    if (formatted.length > 5) {
-      formatted = formatted.substring(0, 5); // Potong jika melebihi 5 karakter
-    }
-
+    
+    if (formatted.length > 5) formatted = formatted.substring(0, 5);
+    
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
@@ -40,32 +30,7 @@ class RtRwInputFormatter extends TextInputFormatter {
   }
 }
 
-// ----------------------
-// Main + Supabase init
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Supabase.initialize(
-    url: 'https://qrpwmbohdxzqkcbybvue.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFycHdtYm9oZHh6cWtjYnlidnVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5OTAxMzEsImV4cCI6MjA3MzU2NjEzMX0.Yc46cV6EKSigAvjSyoWscTrC6LkHA-A84mjWdZOnuyA',
-  );
-  runApp(const HomeScreens());
-}
-
-class HomeScreens extends StatelessWidget {
-  const HomeScreens({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: DaftarSiswaDigitalPage(),
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-// ----------------------
-// Halaman Form
+// =================== MAIN FORM CLASS ===================
 class DaftarSiswaDigitalPage extends StatefulWidget {
   const DaftarSiswaDigitalPage({super.key});
 
@@ -76,44 +41,140 @@ class DaftarSiswaDigitalPage extends StatefulWidget {
 class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
   final _formKey = GlobalKey<FormState>();
 
+  // Dropdown selections
   String? _selectedGender;
   String? _selectedReligion;
 
-  // controllers siswa
-  final TextEditingController _tempatLahirController = TextEditingController();
-  final TextEditingController _tanggalLahirController = TextEditingController();
-  final TextEditingController _nisnController = TextEditingController();
-  final TextEditingController _namaController = TextEditingController();
-  final TextEditingController _noHpController = TextEditingController();
-  final TextEditingController _nikController = TextEditingController();
+  // Text Controllers - Inisialisasi dengan aman
+  late final TextEditingController _tempatLahirController;
+  late final TextEditingController _tanggalLahirController;
+  late final TextEditingController _nisnController;
+  late final TextEditingController _namaController;
+  late final TextEditingController _noHpController;
+  late final TextEditingController _nikController;
 
-  // alamat
-  final TextEditingController _jalanController = TextEditingController();
-  final TextEditingController _rtRwController = TextEditingController();
-  final TextEditingController _dusunController = TextEditingController();
-  final TextEditingController _desaController = TextEditingController();
-  final TextEditingController _kecamatanController = TextEditingController();
-  final TextEditingController _kabupatenController = TextEditingController();
-  final TextEditingController _provinsiController = TextEditingController();
-  final TextEditingController _kodePosController = TextEditingController();
+  // Alamat Controllers
+  late final TextEditingController _jalanController;
+  late final TextEditingController _rtController;
+  late final TextEditingController _rwController;
+  late final TextEditingController _dusunController;
+  late final TextEditingController _desaController;
+  late final TextEditingController _kecamatanController;
+  late final TextEditingController _kabupatenController;
+  late final TextEditingController _provinsiController;
+  late final TextEditingController _kodePosController;
 
-  // orang tua / wali
-  final TextEditingController _namaAyahController = TextEditingController();
-  final TextEditingController _namaIbuController = TextEditingController();
-  final TextEditingController _namaWaliController = TextEditingController();
-  final TextEditingController _alamatOrtuController = TextEditingController();
+  // Orang tua / wali Controllers
+  late final TextEditingController _namaAyahController;
+  late final TextEditingController _namaIbuController;
+  late final TextEditingController _namaWaliController;
+  late final TextEditingController _alamatOrtuController;
 
-  // list locations (diambil dari tabel locations)
   List<Map<String, dynamic>> _locationsList = [];
 
   @override
   void initState() {
     super.initState();
+    
+    // Inisialisasi semua controllers
+    _initializeControllers();
+    
+    // Validasi controllers
+    _validateControllers();
+    
+    // Load locations untuk autocomplete
     _loadLocations();
+  }
+
+  void _initializeControllers() {
+    _tempatLahirController = TextEditingController();
+    _tanggalLahirController = TextEditingController();
+    _nisnController = TextEditingController();
+    _namaController = TextEditingController();
+    _noHpController = TextEditingController();
+    _nikController = TextEditingController();
+    _jalanController = TextEditingController();
+    _rtController = TextEditingController();
+    _rwController = TextEditingController();
+    _dusunController = TextEditingController();
+    _desaController = TextEditingController();
+    _kecamatanController = TextEditingController();
+    _kabupatenController = TextEditingController();
+    _provinsiController = TextEditingController();
+    _kodePosController = TextEditingController();
+    _namaAyahController = TextEditingController();
+    _namaIbuController = TextEditingController();
+    _namaWaliController = TextEditingController();
+    _alamatOrtuController = TextEditingController();
+  }
+
+  void _validateControllers() {
+    print("=== VALIDATING CONTROLLERS ===");
+    
+    final controllers = {
+      'tempatLahir': _tempatLahirController,
+      'tanggalLahir': _tanggalLahirController,
+      'nisn': _nisnController,
+      'nama': _namaController,
+      'noHp': _noHpController,
+      'nik': _nikController,
+      'jalan': _jalanController,
+      'rt': _rtController,
+      'rw': _rwController,
+      'dusun': _dusunController,
+      'desa': _desaController,
+      'kecamatan': _kecamatanController,
+      'kabupaten': _kabupatenController,
+      'provinsi': _provinsiController,
+      'kodePos': _kodePosController,
+      'namaAyah': _namaAyahController,
+      'namaIbu': _namaIbuController,
+      'namaWali': _namaWaliController,
+      'alamatOrtu': _alamatOrtuController,
+    };
+    
+    bool allControllersValid = true;
+    controllers.forEach((name, controller) {
+      if (controller == null) {
+        print("ERROR: Controller $name is null!");
+        allControllersValid = false;
+      } else {
+        print("OK: Controller $name initialized");
+      }
+    });
+    
+    print("Selected Gender: $_selectedGender");
+    print("Selected Religion: $_selectedReligion");
+    print("All controllers valid: $allControllersValid");
+    print("===============================");
+  }
+
+  Future<void> _loadLocations() async {
+    try {
+      print("Loading locations...");
+      final response = await Supabase.instance.client.from('locations').select();
+      if (mounted) {
+        setState(() {
+          _locationsList = List<Map<String, dynamic>>.from(response);
+        });
+      }
+      print("Locations loaded: ${_locationsList.length} items");
+    } catch (e) {
+      print("Error loading locations: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Gagal memuat data lokasi: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
+    // Dispose semua controllers
     _tempatLahirController.dispose();
     _tanggalLahirController.dispose();
     _nisnController.dispose();
@@ -121,7 +182,8 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
     _noHpController.dispose();
     _nikController.dispose();
     _jalanController.dispose();
-    _rtRwController.dispose();
+    _rtController.dispose();
+    _rwController.dispose();
     _dusunController.dispose();
     _desaController.dispose();
     _kecamatanController.dispose();
@@ -135,38 +197,7 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
     super.dispose();
   }
 
-  Future<void> _loadLocations() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult == ConnectivityResult.none) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Tidak ada koneksi internet. Silakan cek koneksi Anda."),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      final response = await Supabase.instance.client.from('locations').select();
-      setState(() {
-        _locationsList = List<Map<String, dynamic>>.from(response);
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Gagal memuat data lokasi dari Supabase: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // formatter helpers
+  // Input formatters
   List<TextInputFormatter> onlyNumber(int max) => [
         LengthLimitingTextInputFormatter(max),
         FilteringTextInputFormatter.digitsOnly,
@@ -186,7 +217,7 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // header
+              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
@@ -217,9 +248,9 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
                           ),
                         ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Image.asset("assets/images/logo.png"),
+                      child: const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Icon(Icons.school, size: 60, color: Colors.deepOrange),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -249,9 +280,7 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                   elevation: 2,
                   child: Padding(
                     padding: const EdgeInsets.all(18),
@@ -269,42 +298,23 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
                           ),
                           const SizedBox(height: 16),
 
-                          // fields utama
-                          buildTextField(
-                            "NISN",
-                            _nisnController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: onlyNumber(10),
-                          ),
-                          buildTextField(
-                            "Nama Lengkap",
-                            _namaController,
-                            keyboardType: TextInputType.text,
-                            inputFormatters: onlyText(35),
-                          ),
+                          // Fields utama
+                          buildTextField("NISN", _nisnController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: onlyNumber(10)),
+                          buildTextField("Nama Lengkap", _namaController,
+                              keyboardType: TextInputType.text,
+                              inputFormatters: onlyText(35)),
 
-                          buildDropdownField(
-                            "Jenis Kelamin",
-                            ["Laki-laki", "Perempuan", "Lainnya"],
-                            _selectedGender,
-                            (val) => setState(() => _selectedGender = val),
-                          ),
+                          buildDropdownField("Jenis Kelamin",
+                              ["Laki-laki", "Perempuan", "Lainnya"], _selectedGender,
+                              (val) => setState(() => _selectedGender = val)),
 
-                          buildDropdownField(
-                            "Agama",
-                            [
-                              "Islam",
-                              "Kristen",
-                              "Katolik",
-                              "Hindu",
-                              "Buddha",
-                              "Konghucu",
-                              "Lainnya",
-                            ],
-                            _selectedReligion,
-                            (val) => setState(() => _selectedReligion = val),
-                          ),
+                          buildDropdownField("Agama",
+                              ["Islam", "Kristen", "Katolik", "Hindu", "Buddha", "Konghucu", "Lainnya"],
+                              _selectedReligion, (val) => setState(() => _selectedReligion = val)),
 
+                          // Tempat & Tanggal Lahir
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Row(
@@ -314,12 +324,9 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
                                     controller: _tempatLahirController,
                                     inputFormatters: onlyText(15),
                                     decoration: inputDecoration("Tempat Lahir"),
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return "Tempat lahir tidak boleh kosong";
-                                      }
-                                      return null;
-                                    },
+                                    validator: (value) => (value == null || value.isEmpty)
+                                        ? "Tempat lahir tidak boleh kosong"
+                                        : null,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -327,16 +334,11 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
                                   child: TextFormField(
                                     controller: _tanggalLahirController,
                                     readOnly: true,
-                                    decoration: inputDecoration("Tanggal Lahir")
-                                        .copyWith(
-                                      suffixIcon: const Icon(
-                                        Icons.calendar_today,
-                                        color: Colors.orange,
-                                      ),
+                                    decoration: inputDecoration("Tanggal Lahir").copyWith(
+                                      suffixIcon: const Icon(Icons.calendar_today, color: Colors.orange),
                                     ),
                                     onTap: () async {
-                                      DateTime? pickedDate =
-                                          await showDatePicker(
+                                      DateTime? pickedDate = await showDatePicker(
                                         context: context,
                                         initialDate: DateTime.now(),
                                         firstDate: DateTime(1950),
@@ -349,274 +351,91 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
                                         });
                                       }
                                     },
-                                    validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return "Tanggal lahir tidak boleh kosong";
-                                      }
-                                      return null;
-                                    },
+                                    validator: (value) => (value == null || value.isEmpty)
+                                        ? "Tanggal lahir tidak boleh kosong"
+                                        : null,
                                   ),
                                 ),
                               ],
                             ),
                           ),
 
-                          buildTextField(
-                            "No. Tlp/HP",
-                            _noHpController,
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: onlyNumber(15),
-                          ),
-                          buildTextField(
-                            "NIK",
-                            _nikController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: onlyNumber(16),
-                          ),
+                          buildTextField("No. Tlp/HP", _noHpController,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: onlyNumber(15)),
+                          buildTextField("NIK", _nikController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: onlyNumber(16)),
 
-                          // Section alamat
+                          // Section alamat dengan RT/RW terpisah
                           buildSectionCard("Alamat", [
                             buildTextField("Jalan", _jalanController),
-                            buildTextField(
-                              "RT/RW",
-                              _rtRwController,
-                              keyboardType: TextInputType.text,
-                              inputFormatters: [RtRwInputFormatter()],
-                            ),
-                            // Autocomplete Dusun (menggunakan data _locationsList)
-                            // Saat user memilih, otomatis isi desa/kecamatan/dst
-                            Autocomplete<String>(
-                              optionsBuilder:
-                                  (TextEditingValue textEditingValue) {
-                                if (textEditingValue.text.isEmpty) {
-                                  return const Iterable<String>.empty();
-                                }
-                                return _locationsList
-                                    .map((item) => (item['dusun'] ?? '') as String)
-                                    .where((dusun) => dusun
-                                        .toLowerCase()
-                                        .contains(textEditingValue.text.toLowerCase()));
-                              },
-                              onSelected: (String selection) {
-                                _dusunController.text = selection;
-
-                                final Map<String, dynamic> selectedLocation =
-                                    _locationsList.firstWhere(
-                                  (item) => (item['dusun'] ?? '') == selection,
-                                  orElse: () => <String, dynamic>{},
-                                );
-
-                                if (selectedLocation.isNotEmpty) {
-                                  setState(() {
-                                    _desaController.text =
-                                        selectedLocation['desa'] ?? '';
-                                    _kecamatanController.text =
-                                        selectedLocation['kecamatan'] ?? '';
-                                    _kabupatenController.text =
-                                        selectedLocation['kabupaten'] ?? '';
-                                    _provinsiController.text =
-                                        selectedLocation['provinsi'] ?? '';
-                                    _kodePosController.text =
-                                        (selectedLocation['kode_pos'] ?? '')
-                                            .toString();
-                                  });
-                                }
-                              },
-                              optionsViewBuilder:
-                                  (context, onSelected, options) {
-                                final list = options.toList();
-                                return Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Material(
-                                    elevation: 2,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: ConstrainedBox(
-                                      constraints:
-                                          const BoxConstraints(maxHeight: 200),
-                                      child: ListView.builder(
-                                        padding: EdgeInsets.zero,
-                                        shrinkWrap: true,
-                                        itemCount: list.length,
-                                        itemBuilder: (context, index) {
-                                          final option = list[index];
-                                          return InkWell(
-                                            onTap: () => onSelected(option),
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 8),
-                                              child: Text(option,
-                                                  style:
-                                                      const TextStyle(fontSize: 14)),
-                                            ),
-                                          );
-                                        },
-                                      ),
+                            
+                            // RT dan RW dipisah sesuai struktur database
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _rtController,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 3,
+                                      inputFormatters: onlyNumber(3),
+                                      decoration: inputDecoration("RT").copyWith(counterText: ""),
+                                      validator: (val) => (val == null || val.isEmpty) ? "RT wajib diisi" : null,
                                     ),
                                   ),
-                                );
-                              },
-                              fieldViewBuilder: (
-                                context,
-                                textEditingController,
-                                focusNode,
-                                onEditingComplete,
-                              ) {
-                                // sinkron ke controller internal
-                                textEditingController.text =
-                                    _dusunController.text;
-                                textEditingController.addListener(() {
-                                  _dusunController.text =
-                                      textEditingController.text;
-                                });
-
-                                return TextFormField(
-                                  controller: textEditingController,
-                                  focusNode: focusNode,
-                                  decoration: inputDecoration("Dusun"),
-                                  validator: (value) => (value == null || value.isEmpty)
-                                      ? "Dusun tidak boleh kosong"
-                                      : null,
-                                );
-                              },
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _rwController,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 3,
+                                      inputFormatters: onlyNumber(3),
+                                      decoration: inputDecoration("RW").copyWith(counterText: ""),
+                                      validator: (val) => (val == null || val.isEmpty) ? "RW wajib diisi" : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            buildTextField("Desa", _desaController,
-                                inputFormatters: onlyText(50)),
-                            buildTextField("Kecamatan", _kecamatanController,
-                                inputFormatters: onlyText(50)),
-                            buildTextField("Kabupaten", _kabupatenController,
-                                inputFormatters: onlyText(50)),
-                            buildTextField("Provinsi", _provinsiController,
-                                inputFormatters: onlyText(50)),
+                            
+                            // Autocomplete Dusun dengan auto-fill alamat
+                            buildDusunAutocomplete(),
+                            
+                            buildTextField("Desa", _desaController, inputFormatters: onlyText(50)),
+                            buildTextField("Kecamatan", _kecamatanController, inputFormatters: onlyText(50)),
+                            buildTextField("Kabupaten", _kabupatenController, inputFormatters: onlyText(50)),
+                            buildTextField("Provinsi", _provinsiController, inputFormatters: onlyText(50)),
                             buildTextField("Kode Pos", _kodePosController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: onlyNumber(5)),
+                                keyboardType: TextInputType.number, inputFormatters: onlyNumber(5)),
                           ]),
 
                           // Section orang tua / wali
                           buildSectionCard("Orang Tua / Wali", [
-                            buildTextField("Nama Ayah", _namaAyahController,
-                                inputFormatters: onlyText(35)),
-                            buildTextField("Nama Ibu", _namaIbuController,
-                                inputFormatters: onlyText(35)),
-                            buildTextField("Nama Wali", _namaWaliController,
-                                inputFormatters: onlyText(35)),
-                            buildTextField(
-                                "Alamat Orang Tua/Wali", _alamatOrtuController),
+                            buildTextField("Nama Ayah", _namaAyahController, inputFormatters: onlyText(35)),
+                            buildTextField("Nama Ibu", _namaIbuController, inputFormatters: onlyText(35)),
+                            buildTextField("Nama Wali", _namaWaliController, inputFormatters: onlyText(35)),
+                            buildTextField("Alamat Orang Tua/Wali", _alamatOrtuController),
                           ]),
 
                           const SizedBox(height: 30),
 
+                          // Tombol Simpan dengan error handling
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.deepOrange,
                                 padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                 elevation: 2,
                               ),
-                              onPressed: () async {
-                                if (_formKey.currentState!.validate()) {
-                                  var connectivityResult =
-                                      await (Connectivity().checkConnectivity());
-                                  if (connectivityResult ==
-                                      ConnectivityResult.none) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                        content: Text(
-                                          "Tidak ada koneksi internet. Silakan cek koneksi Anda.",
-                                        ),
-                                        backgroundColor: Colors.red,
-                                      ));
-                                    }
-                                    return;
-                                  }
-
-                                  try {
-                                    await Supabase.instance.client
-                                        .from('siswa')
-                                        .insert({
-                                      'nisn': _nisnController.text,
-                                      'nama_lengkap': _namaController.text,
-                                      'jenis_kelamin': _selectedGender,
-                                      'agama': _selectedReligion,
-                                      'tempat_lahir':
-                                          _tempatLahirController.text,
-                                      'tanggal_lahir':
-                                          _tanggalLahirController.text,
-                                      'no_tlp': _noHpController.text,
-                                      'nik': _nikController.text,
-                                      'jalan': _jalanController.text,
-                                      'rt_rw': _rtRwController.text,
-                                      'dusun': _dusunController.text,
-                                      'desa': _desaController.text,
-                                      'kecamatan': _kecamatanController.text,
-                                      'kabupaten': _kabupatenController.text,
-                                      'provinsi': _provinsiController.text,
-                                      'kode_pos': _kodePosController.text,
-                                      'nama_ayah': _namaAyahController.text,
-                                      'nama_ibu': _namaIbuController.text,
-                                      'nama_wali': _namaWaliController.text,
-                                      'alamat_orang_tua_wali':
-                                          _alamatOrtuController.text,
-                                    });
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                        content:
-                                            Text('Data berhasil disimpan'),
-                                        backgroundColor: Colors.green,
-                                      ));
-                                    }
-
-                                    _formKey.currentState!.reset();
-                                    // kosongkan controllers juga jika butuh:
-                                    _nisnController.clear();
-                                    _namaController.clear();
-                                    _selectedGender = null;
-                                    _selectedReligion = null;
-                                    _tempatLahirController.clear();
-                                    _tanggalLahirController.clear();
-                                    _noHpController.clear();
-                                    _nikController.clear();
-                                    _jalanController.clear();
-                                    _rtRwController.clear();
-                                    _dusunController.clear();
-                                    _desaController.clear();
-                                    _kecamatanController.clear();
-                                    _kabupatenController.clear();
-                                    _provinsiController.clear();
-                                    _kodePosController.clear();
-                                    _namaAyahController.clear();
-                                    _namaIbuController.clear();
-                                    _namaWaliController.clear();
-                                    _alamatOrtuController.clear();
-
-                                    setState(() {}); // refresh UI
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(SnackBar(
-                                        content: Text(
-                                            'Error saat menyimpan data ke Supabase: $e'),
-                                        backgroundColor: Colors.red,
-                                      ));
-                                    }
-                                  }
-                                }
-                              },
+                              onPressed: _submitForm,
                               child: const Text(
                                 "Simpan",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                ),
+                                style: TextStyle(color: Colors.white, fontSize: 16),
                               ),
                             ),
                           ),
@@ -633,13 +452,182 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
     );
   }
 
-  // ----------------------
+  Widget buildDusunAutocomplete() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Autocomplete<String>(
+        optionsBuilder: (TextEditingValue textEditingValue) {
+          if (textEditingValue.text.isEmpty) {
+            return const Iterable<String>.empty();
+          }
+          
+          // Null safety untuk _locationsList
+          if (_locationsList.isEmpty) {
+            return const Iterable<String>.empty();
+          }
+          
+          return _locationsList
+              .map((item) => (item['dusun']?.toString() ?? ''))
+              .where((dusun) => dusun.isNotEmpty && dusun
+                  .toLowerCase()
+                  .contains(textEditingValue.text.toLowerCase()));
+        },
+        onSelected: (String selection) {
+          _dusunController.text = selection;
+
+          try {
+            final Map<String, dynamic> selectedLocation = _locationsList.firstWhere(
+              (item) => (item['dusun']?.toString() ?? '') == selection,
+              orElse: () => <String, dynamic>{},
+            );
+
+            if (selectedLocation.isNotEmpty) {
+              setState(() {
+                _desaController.text = selectedLocation['desa']?.toString() ?? '';
+                _kecamatanController.text = selectedLocation['kecamatan']?.toString() ?? '';
+                _kabupatenController.text = selectedLocation['kabupaten']?.toString() ?? '';
+                _provinsiController.text = selectedLocation['provinsi']?.toString() ?? '';
+                _kodePosController.text = (selectedLocation['kode_pos']?.toString() ?? '');
+              });
+            }
+          } catch (e) {
+            print("Error selecting location: $e");
+          }
+        },
+        fieldViewBuilder: (context, textEditingController, focusNode, onEditingComplete) {
+          // Sinkronisasi dengan controller utama
+          if (_dusunController.text != textEditingController.text) {
+            textEditingController.text = _dusunController.text;
+          }
+          
+          textEditingController.addListener(() {
+            if (_dusunController.text != textEditingController.text) {
+              _dusunController.text = textEditingController.text;
+            }
+          });
+
+          return TextFormField(
+            controller: textEditingController,
+            focusNode: focusNode,
+            decoration: inputDecoration("Dusun"),
+            validator: (value) => (value == null || value.isEmpty) ? "Dusun tidak boleh kosong" : null,
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Debug: Print semua nilai sebelum submit
+    print("=== DEBUG FORM VALUES ===");
+    print("NISN: '${_nisnController.text}'");
+    print("Nama: '${_namaController.text}'");
+    print("Gender: '$_selectedGender'");
+    print("Agama: '$_selectedReligion'");
+    print("Tempat Lahir: '${_tempatLahirController.text}'");
+    print("Tanggal Lahir: '${_tanggalLahirController.text}'");
+    print("No HP: '${_noHpController.text}'");
+    print("NIK: '${_nikController.text}'");
+    print("Jalan: '${_jalanController.text}'");
+    print("RT: '${_rtController.text}'");
+    print("RW: '${_rwController.text}'");
+    print("Dusun: '${_dusunController.text}'");
+    print("Desa: '${_desaController.text}'");
+    print("Kecamatan: '${_kecamatanController.text}'");
+    print("Kabupaten: '${_kabupatenController.text}'");
+    print("Provinsi: '${_provinsiController.text}'");
+    print("Kode Pos: '${_kodePosController.text}'");
+    print("Nama Ayah: '${_namaAyahController.text}'");
+    print("Nama Ibu: '${_namaIbuController.text}'");
+    print("Nama Wali: '${_namaWaliController.text}'");
+    print("Alamat Ortu: '${_alamatOrtuController.text}'");
+    print("========================");
+
+    try {
+      // Buat data dengan null safety
+      final Map<String, dynamic> studentData = {
+        'nisn': _nisnController.text.trim(),
+        'nama_lengkap': _namaController.text.trim(),
+        'jenis_kelamin': _selectedGender ?? '',
+        'agama': _selectedReligion ?? '',
+        'tempat_lahir': _tempatLahirController.text.trim(),
+        'tanggal_lahir': _tanggalLahirController.text.trim(),
+        'no_tlp': _noHpController.text.trim(),
+        'nik': _nikController.text.trim(),
+        'jalan': _jalanController.text.trim(),
+        'rt': _rtController.text.trim(),
+        'rw': _rwController.text.trim(),
+        'dusun': _dusunController.text.trim(),
+        'desa': _desaController.text.trim(),
+        'kecamatan': _kecamatanController.text.trim(),
+        'kabupaten': _kabupatenController.text.trim(),
+        'provinsi': _provinsiController.text.trim(),
+        'kode_pos': _kodePosController.text.trim(),
+        'nama_ayah': _namaAyahController.text.trim(),
+        'nama_ibu': _namaIbuController.text.trim(),
+        'nama_wali': _namaWaliController.text.trim(),
+        'alamat_orang_tua_wali': _alamatOrtuController.text.trim(),
+      };
+
+      print("Data yang akan dikirim: $studentData");
+
+      await Supabase.instance.client.from('siswa').insert(studentData);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Data berhasil disimpan'),
+          backgroundColor: Colors.green,
+        ));
+      }
+
+      // Reset form
+      _formKey.currentState!.reset();
+      _clearAllControllers();
+      setState(() {
+        _selectedGender = null;
+        _selectedReligion = null;
+      });
+      
+    } catch (e) {
+      print("Error detail: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  void _clearAllControllers() {
+    _nisnController.clear();
+    _namaController.clear();
+    _tempatLahirController.clear();
+    _tanggalLahirController.clear();
+    _noHpController.clear();
+    _nikController.clear();
+    _jalanController.clear();
+    _rtController.clear();
+    _rwController.clear();
+    _dusunController.clear();
+    _desaController.clear();
+    _kecamatanController.clear();
+    _kabupatenController.clear();
+    _provinsiController.clear();
+    _kodePosController.clear();
+    _namaAyahController.clear();
+    _namaIbuController.clear();
+    _namaWaliController.clear();
+    _alamatOrtuController.clear();
+  }
+
   // Helper UI functions
   InputDecoration inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      floatingLabelStyle: const TextStyle(
-          color: Colors.deepOrange, fontWeight: FontWeight.bold),
+      floatingLabelStyle: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold),
       hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
       filled: true,
       fillColor: Colors.grey.shade100,
@@ -655,14 +643,11 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
     );
   }
 
-  Widget buildTextField(
-    String label,
-    TextEditingController controller, {
-    TextInputType? keyboardType,
-    bool readOnly = false,
-    VoidCallback? onTap,
-    List<TextInputFormatter>? inputFormatters,
-  }) {
+  Widget buildTextField(String label, TextEditingController controller,
+      {TextInputType? keyboardType,
+      bool readOnly = false,
+      VoidCallback? onTap,
+      List<TextInputFormatter>? inputFormatters}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextFormField(
@@ -673,18 +658,12 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
         inputFormatters: inputFormatters,
         style: const TextStyle(fontSize: 16),
         decoration: inputDecoration(label),
-        validator: (val) =>
-            val == null || val.isEmpty ? "$label kosong" : null,
+        validator: (val) => val == null || val.isEmpty ? "$label kosong" : null,
       ),
     );
   }
 
-  Widget buildDropdownField(
-    String label,
-    List<String> items,
-    String? value,
-    Function(String?) onChanged,
-  ) {
+  Widget buildDropdownField(String label, List<String> items, String? value, Function(String?) onChanged) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: DropdownButtonFormField<String>(
@@ -694,16 +673,13 @@ class _DaftarSiswaDigitalPageState extends State<DaftarSiswaDigitalPage> {
         style: const TextStyle(color: Colors.black, fontSize: 14),
         isExpanded: true,
         items: items
-            .map(
-              (item) => DropdownMenuItem(
-                value: item,
-                child: Text(item, style: const TextStyle(fontSize: 14)),
-              ),
-            )
+            .map((item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 14)),
+                ))
             .toList(),
         onChanged: onChanged,
-        validator: (value) =>
-            (value == null || value.isEmpty) ? "$label tidak boleh kosong" : null,
+        validator: (value) => (value == null || value.isEmpty) ? "$label tidak boleh kosong" : null,
       ),
     );
   }

@@ -37,6 +37,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool _isNavigating = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,12 +49,201 @@ class _SplashScreenState extends State<SplashScreen> {
     // tampil splash 5 detik
     await Future.delayed(const Duration(seconds: 5));
 
-    if (!mounted) return;
+    if (!mounted || _isNavigating) return;
 
-    // langsung masuk HomeScreens
+    // langsung masuk HomeScreens dan cek internet secara parallel
+    _navigateAndCheckInternet();
+  }
+
+  void _navigateAndCheckInternet() async {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    // Navigasi ke HomeScreens terlebih dahulu
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const HomeScreens()),
+    ).then((_) {
+      // Setelah navigasi selesai, cek internet dengan timeout
+      _checkInternetWithTimeout();
+    });
+  }
+
+  void _checkInternetWithTimeout() async {
+    try {
+      // Cek koneksi dengan timeout 5 detik (lebih lama untuk memastikan)
+      bool hasInternet = await InternetConnectionChecker()
+          .hasConnection
+          .timeout(const Duration(seconds: 5));
+
+      if (!hasInternet && mounted) {
+        // Tunggu lebih lama agar widget DaftarSiswaDigitalPage sudah terinisialisasi
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (mounted) {
+          _showInternetErrorPopup();
+        }
+      }
+    } catch (e) {
+      // Jika timeout atau error, anggap tidak ada internet
+      if (mounted) {
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (mounted) {
+          _showInternetErrorPopup();
+        }
+      }
+    }
+  }
+
+  void _navigateToHome() {
+    if (_isNavigating) return;
+    _isNavigating = true;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreens()),
+    );
+  }
+
+  void _showInternetErrorPopup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.orangeAccent,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Logo dalam circle putih
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(
+                      "assets/images/logo.png",
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.wifi_off,
+                          size: 40,
+                          color: Colors.orangeAccent,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Pesan error
+                const Text(
+                  "Tidak Dapat Terhubung ke Aplikasi, Mohon Periksa Koneksi Internet Anda",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Tombol
+                Row(
+                  children: [
+                    // Tombol Kembali
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text(
+                          "Kembali",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Tombol Simpan (Coba Lagi)
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black87,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          
+                          // Tampilkan loading
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.orangeAccent,
+                              ),
+                            ),
+                          );
+
+                          try {
+                            // Cek koneksi lagi dengan timeout
+                            bool hasInternet = await InternetConnectionChecker()
+                                .hasConnection
+                                .timeout(const Duration(seconds: 5));
+                            
+                            if (mounted) Navigator.pop(context); // Tutup loading
+                            
+                            if (!hasInternet && mounted) {
+                              // Masih tidak ada internet - tampilkan pop-up lagi
+                              _showInternetErrorPopup();
+                            } else if (mounted) {
+                              // Koneksi sudah ada - navigasi ke home
+                              _navigateToHome();
+                            }
+                          } catch (e) {
+                            if (mounted) Navigator.pop(context); // Tutup loading
+                            if (mounted) {
+                              _showInternetErrorPopup();
+                            }
+                          }
+                        },
+                        child: const Text(
+                          "Simpan",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -221,3 +412,8 @@ class NavBarPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+// Sekarang menggunakan widget asli dari folder widgets/
+// DaftarSiswaDigitalPage dan ListPage akan diimport dari:
+// import 'package:project4_remedial/widgets/AddFormSiswa.dart';
+// import 'package:project4_remedial/widgets/AddDaftarSiswa.dart';
